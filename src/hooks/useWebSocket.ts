@@ -17,7 +17,7 @@ let tickBuffer: {
   volume: number;
 }[] = [];
 
-let animationFrameId: number | null = null;
+
 
 function processTickBuffer() {
   if (tickBuffer.length > 0) {
@@ -25,12 +25,12 @@ function processTickBuffer() {
     tickBuffer = [];
     useStreamStore.getState().updatePrices(ticks);
   }
-  animationFrameId = requestAnimationFrame(processTickBuffer);
+  requestAnimationFrame(processTickBuffer);
 }
 
 // Start buffer loop on client
 if (typeof window !== "undefined") {
-  animationFrameId = requestAnimationFrame(processTickBuffer);
+  requestAnimationFrame(processTickBuffer);
 }
 
 function getWebSocket(): Promise<WebSocket> {

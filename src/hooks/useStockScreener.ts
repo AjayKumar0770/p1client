@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useUIStore } from "../stores/uiStore";
 import { useStreamStore } from "../stores/streamStore";
 import { Lexer, Parser, optimizeAST, evaluateAST, stableSortStocks, ASTNode } from "../lib/filter/parser";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { Stock } from "../types/index";
 
 export function useStockScreener() {
@@ -35,8 +35,12 @@ export function useStockScreener() {
       
       setFilterError(null); // Clear error on successful compile
       return optimized;
-    } catch (err: any) {
-      setFilterError(err.message || "Query compilation error");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setFilterError(err.message || "Query compilation error");
+      } else {
+        setFilterError("Query compilation error");
+      }
       return null;
     }
   }, [rawFilterString, setFilterError]);
@@ -69,6 +73,7 @@ export function useStockScreener() {
 
     // Apply stable multi-sort
     return stableSortStocks(result, sorting, livePrices);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allStocks, parsedAST, rawFilterString, filterError, sorting]);
 
   return {

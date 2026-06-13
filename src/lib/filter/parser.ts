@@ -255,7 +255,7 @@ export class Parser {
     return {
       type: "COMPARISON",
       field,
-      operator: op as any,
+      operator: op as ">" | "<" | ">=" | "<=" | "==" | "!=" | "contains",
       value
     };
   }
@@ -302,11 +302,11 @@ export function optimizeAST(node: ASTNode): ASTNode {
 }
 
 // Main evaluation routine
-export function evaluateAST(node: ASTNode, stock: Stock, livePrices?: Record<string, any>): boolean {
+export function evaluateAST(node: ASTNode, stock: Stock, livePrices?: Record<string, { price: number; changePercent: number; volume: number }>): boolean {
   switch (node.type) {
     case "COMPARISON": {
       // Resolve value, check live pricing store if available
-      let stockValue: any;
+      let stockValue: number | string | undefined;
       if (livePrices && livePrices[stock.symbol] && ["price", "changePercent", "volume"].includes(node.field)) {
         const live = livePrices[stock.symbol];
         if (node.field === "price") stockValue = live.price;
@@ -378,7 +378,7 @@ export function evaluateAST(node: ASTNode, stock: Stock, livePrices?: Record<str
 export function stableSortStocks(
   stocks: Stock[],
   sorting: { id: string; desc: boolean }[],
-  livePrices?: Record<string, any>
+  livePrices?: Record<string, { price: number; changePercent: number; volume: number }>
 ): Stock[] {
   if (sorting.length === 0) return stocks;
 
@@ -391,12 +391,12 @@ export function stableSortStocks(
       const desc = sortOption.desc;
 
       // Get values (checking live overrides)
-      let valA: any;
-      let valB: any;
+      let valA: number | string | undefined;
+      let valB: number | string | undefined;
 
       if (livePrices && ["price", "changePercent", "volume"].includes(field)) {
-        valA = livePrices[a.item.symbol]?.[field] ?? a.item[field as keyof Stock];
-        valB = livePrices[b.item.symbol]?.[field] ?? b.item[field as keyof Stock];
+        valA = livePrices[a.item.symbol]?.[field as "price" | "changePercent" | "volume"] ?? a.item[field as keyof Stock];
+        valB = livePrices[b.item.symbol]?.[field as "price" | "changePercent" | "volume"] ?? b.item[field as keyof Stock];
       } else {
         valA = a.item[field as keyof Stock];
         valB = b.item[field as keyof Stock];
@@ -409,8 +409,7 @@ export function stableSortStocks(
           const comparison = valA.localeCompare(valB);
           return desc ? -comparison : comparison;
         } else {
-          // Numbers
-          return desc ? (valB - valA) : (valA - valB);
+          return desc ? (Number(valB) - Number(valA)) : (Number(valA) - Number(valB));
         }
       }
     }

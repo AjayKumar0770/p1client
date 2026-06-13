@@ -22,27 +22,27 @@ function createMockCandles(prices: number[], volumes?: number[]): Candle[] {
 
 describe("Technical Indicator Math Utilities", () => {
   test("Simple Moving Average (SMA)", () => {
-    const candles = createMockCandles([10, 20, 30, 40, 50]);
-    const sma3 = calculateSMA(candles, 3);
+    const prices = [100, 102, 104, 103, 105, 107, 106, 108, 110, 109];
+    const candles = createMockCandles(prices);
+    const sma5 = calculateSMA(candles, 5);
 
-    expect(sma3.length).toBe(3); // Elements: [10,20,30], [20,30,40], [30,40,50]
-    expect(sma3[0].value).toBe(20); // (10+20+30)/3
-    expect(sma3[1].value).toBe(30); // (20+30+40)/3
-    expect(sma3[2].value).toBe(40); // (30+40+50)/3
+    expect(sma5.length).toBe(6);
+    expect(sma5.map((p) => p.value)).toEqual([
+      102.8, 104.2, 105.0, 105.8, 107.2, 108.0
+    ]);
   });
 
   test("Exponential Moving Average (EMA)", () => {
-    const candles = createMockCandles([10, 20, 30, 40, 50]);
-    const ema3 = calculateEMA(candles, 3);
+    const prices = [100, 102, 104, 103, 105, 107, 106, 108, 110, 109];
+    const candles = createMockCandles(prices);
+    const ema5 = calculateEMA(candles, 5);
     
-    // First EMA = SMA (10+20+30)/3 = 20
-    expect(ema3[0].value).toBe(20);
+    // First EMA = SMA = 102.8 at index 4
+    expect(ema5[0].value).toBe(102.8);
     
-    // Period = 3, k = 2 / (3 + 1) = 0.5
-    // Next EMA = 40 * 0.5 + 20 * 0.5 = 30
-    expect(ema3[1].value).toBe(30);
-    // Next EMA = 50 * 0.5 + 30 * 0.5 = 40
-    expect(ema3[2].value).toBe(40);
+    // Period = 5, k = 2 / (5 + 1) = 0.3333333333333333
+    // Next EMA = 107 * k + 102.8 * (1 - k) = 104.20
+    expect(ema5[1].value).toBeCloseTo(104.20, 2);
   });
 
   test("Bollinger Bands (BB)", () => {
@@ -65,9 +65,18 @@ describe("Technical Indicator Math Utilities", () => {
     const candles = createMockCandles(prices);
     const rsi = calculateRSI(candles, 14);
 
-    expect(rsi.length).toBe(6); // 20 - 14 = 6
+    expect(rsi.length).toBe(6);
     expect(rsi[0].value).toBeGreaterThan(0);
     expect(rsi[0].value).toBeLessThan(100);
+    
+    // Explicit 0/100 checks
+    const zeroLossCandles = createMockCandles(Array.from({ length: 15 }, (_, i) => 10 + i));
+    const zeroLossRsi = calculateRSI(zeroLossCandles, 14);
+    expect(zeroLossRsi[0].value).toBe(100);
+
+    const zeroGainCandles = createMockCandles(Array.from({ length: 15 }, (_, i) => 100 - i));
+    const zeroGainRsi = calculateRSI(zeroGainCandles, 14);
+    expect(zeroGainRsi[0].value).toBe(0);
   });
 
   test("Volume Profile & POC", () => {

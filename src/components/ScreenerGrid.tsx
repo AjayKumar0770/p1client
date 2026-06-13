@@ -12,7 +12,7 @@ import { Stock } from "../types/index";
 import { useUIStore } from "../stores/uiStore";
 import { useStreamStore } from "../stores/streamStore";
 import { useWebSocket } from "../hooks/useWebSocket";
-import { ArrowUp, ArrowDown, Search } from "lucide-react";
+import { ArrowUp, ArrowDown } from "lucide-react";
 
 interface ScreenerGridProps {
   stocks: Stock[];
@@ -203,6 +203,7 @@ export default function ScreenerGrid({ stocks }: ScreenerGridProps) {
   );
 
   // TanStack Table Instance
+  // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: stocks,
     columns,
@@ -288,7 +289,7 @@ export default function ScreenerGrid({ stocks }: ScreenerGridProps) {
     if (cellElement) {
       cellElement.focus();
     }
-  }, [focusedRow, focusedCol, rows.length]);
+  }, [focusedRow, focusedCol, rows.length, rowVirtualizer]);
 
   return (
     <div className="flex flex-col h-full bg-zinc-950 rounded-xl border border-zinc-800 shadow-xl overflow-hidden">

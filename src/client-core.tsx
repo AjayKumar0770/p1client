@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { useEffect, useRef, useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 // ============================================================================
 // 1. DATA MODEL & TYPES DEFINITIONS
@@ -187,10 +188,10 @@ export const useScreenerStore = create<ScreenerStoreState>()(
           state.isLoadingStocks = false;
           state.stocksError = null;
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         set((state) => {
           state.isLoadingStocks = false;
-          state.stocksError = err.message || "Failed to load stock list";
+          state.stocksError = err instanceof Error ? err.message : "Failed to load stock list";
         });
       }
     },
@@ -717,7 +718,7 @@ export class Parser {
     return {
       type: "COMPARISON",
       field,
-      operator: op as any,
+      operator: op as ">" | "<" | ">=" | "<=" | "==" | "!=" | "contains",
       value
     };
   }
@@ -761,7 +762,7 @@ export function optimizeAST(node: ASTNode): ASTNode {
 export function evaluateAST(node: ASTNode, stock: Stock, livePrices?: Record<string, LivePrice>): boolean {
   switch (node.type) {
     case "COMPARISON": {
-      let stockValue: any;
+      let stockValue: number | string | undefined;
       if (livePrices && livePrices[stock.symbol] && ["price", "changePercent", "volume"].includes(node.field)) {
         const live = livePrices[stock.symbol];
         if (node.field === "price") stockValue = live.price;
@@ -836,8 +837,8 @@ export function stableSortStocks(
       const field = sortOption.id;
       const desc = sortOption.desc;
 
-      let valA: any;
-      let valB: any;
+      let valA: number | string | undefined;
+      let valB: number | string | undefined;
 
       if (livePrices && ["price", "changePercent", "volume"].includes(field)) {
         valA = livePrices[a.item.symbol]?.[field as keyof LivePrice] ?? a.item[field as keyof Stock];
@@ -854,7 +855,7 @@ export function stableSortStocks(
           const comparison = valA.localeCompare(valB);
           return desc ? -comparison : comparison;
         } else {
-          return desc ? (valB - valA) : (valA - valB);
+          return desc ? (Number(valB) - Number(valA)) : (Number(valA) - Number(valB));
         }
       }
     }
@@ -874,6 +875,10 @@ let globalWsPromise: Promise<WebSocket> | null = null;
 const globalSubscriptions = new Set<string>();
 const subscriptionRefs = new Map<string, number>();
 
+let reconnectAttempt = 0;
+let reconnectTimeoutId: NodeJS.Timeout | null = null;
+const MAX_RECONNECT_DELAY = 30000;
+
 let tickBuffer: {
   symbol: string;
   price: number;
@@ -882,7 +887,7 @@ let tickBuffer: {
   volume: number;
 }[] = [];
 
-let animationFrameId: number | null = null;
+
 
 function processTickBuffer() {
   if (tickBuffer.length > 0) {
@@ -890,11 +895,11 @@ function processTickBuffer() {
     tickBuffer = [];
     useScreenerStore.getState().updatePrices(ticks);
   }
-  animationFrameId = requestAnimationFrame(processTickBuffer);
+  requestAnimationFrame(processTickBuffer);
 }
 
 if (typeof window !== "undefined") {
-  animationFrameId = requestAnimationFrame(processTickBuffer);
+  requestAnimationFrame(processTickBuffer);
 }
 
 function getWebSocket(): Promise<WebSocket> {
@@ -912,6 +917,7 @@ function getWebSocket(): Promise<WebSocket> {
       ws.onopen = () => {
         globalWs = ws;
         globalWsPromise = null;
+        reconnectAttempt = 0;
         useScreenerStore.getState().setConnectionStatus("connected");
         globalSubscriptions.forEach((sym) => {
           ws.send(JSON.stringify({ type: "subscribe", channel: `subscribe:price:${sym}` }));
@@ -934,9 +940,15 @@ function getWebSocket(): Promise<WebSocket> {
         globalWs = null;
         globalWsPromise = null;
         useScreenerStore.getState().setConnectionStatus("disconnected");
-        setTimeout(() => {
+        
+        if (reconnectTimeoutId) clearTimeout(reconnectTimeoutId);
+        
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempt), MAX_RECONNECT_DELAY);
+        reconnectAttempt++;
+        
+        reconnectTimeoutId = setTimeout(() => {
           getWebSocket().catch((err) => console.error("WS reconnect failed:", err));
-        }, 3000);
+        }, delay);
       };
 
       ws.onerror = (err) => {
@@ -954,7 +966,9 @@ function getWebSocket(): Promise<WebSocket> {
 export function useWebSocket(symbols: string[]) {
   const prevSymbolsRef = useRef<string[]>([]);
   const latestSymbolsRef = useRef<string[]>(symbols);
-  latestSymbolsRef.current = symbols;
+  useEffect(() => {
+    latestSymbolsRef.current = symbols;
+  }, [symbols]);
 
   useEffect(() => {
     const prevSymbols = prevSymbolsRef.current;
@@ -1014,7 +1028,13 @@ export function useWebSocket(symbols: string[]) {
             }
           });
         })
-        .catch((err) => console.error("Failed to cleanup WS in hook:", err));
+        .catch((err) => console.error("Failed to cleanup WS in hook:", err))
+        .finally(() => {
+          if (globalSubscriptions.size === 0 && reconnectTimeoutId) {
+            clearTimeout(reconnectTimeoutId);
+            reconnectTimeoutId = null;
+          }
+        });
     };
   }, []);
 }
@@ -1035,7 +1055,18 @@ export function useStockScreener() {
     setFilterError, 
     sorting, 
     prices 
-  } = useScreenerStore();
+  } = useScreenerStore(useShallow((state) => ({
+    stocks: state.stocks,
+    isLoadingStocks: state.isLoadingStocks,
+    stocksError: state.stocksError,
+    loadStocks: state.loadStocks,
+    rawFilterString: state.rawFilterString,
+    activeSubFilters: state.activeSubFilters,
+    filterError: state.filterError,
+    setFilterError: state.setFilterError,
+    sorting: state.sorting,
+    prices: state.prices
+  })));
 
   useEffect(() => {
     loadStocks();
@@ -1070,8 +1101,12 @@ export function useStockScreener() {
       
       setFilterError(null);
       return optimized;
-    } catch (err: any) {
-      setFilterError(err.message || "Query compilation error");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setFilterError(err.message || "Query compilation error");
+      } else {
+        setFilterError("Query compilation error");
+      }
       return null;
     }
   }, [combinedFilterString, setFilterError]);
