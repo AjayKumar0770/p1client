@@ -288,6 +288,7 @@ export function FilterPanel({ children }: { children: React.ReactNode }) {
                   key={key}
                   onClick={() => handleToggleColumn(key)}
                   className="flex items-center gap-1.5 text-zinc-400 hover:text-white transition select-none"
+                  aria-pressed={isVisible}
                 >
                   {isVisible ? (
                     <CheckSquare className="h-3.5 w-3.5 text-amber-500" />
@@ -349,6 +350,7 @@ FilterPanel.NumericRange = function NumericRange({
             value={valMin}
             onChange={(e) => setValMin(Math.min(parseFloat(e.target.value), valMax))}
             className="w-1/2 accent-amber-500 cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+            aria-label={`Minimum ${label}`}
           />
           <input
             type="range"
@@ -358,6 +360,7 @@ FilterPanel.NumericRange = function NumericRange({
             value={valMax}
             onChange={(e) => setValMax(Math.max(parseFloat(e.target.value), valMin))}
             className="w-1/2 accent-amber-500 cursor-pointer h-1 bg-zinc-800 rounded-lg appearance-none"
+            aria-label={`Maximum ${label}`}
           />
         </div>
       </div>
@@ -417,20 +420,24 @@ FilterPanel.Dropdown = function Dropdown({
       <button
         onClick={() => setOpen(!open)}
         className="w-full bg-zinc-950 border border-zinc-800 hover:border-zinc-700 text-left text-xs text-white px-2.5 py-1.5 rounded-lg flex items-center justify-between transition"
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
         <span className="truncate">
           {selected.length === 0 ? "Select options..." : `${selected.length} selected`}
         </span>
-        <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+        <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
       </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-zinc-900 border border-zinc-800 rounded-lg max-h-40 overflow-y-auto z-40 p-1 shadow-2xl">
+        <div className="absolute left-0 right-0 top-full mt-1 bg-zinc-900 border border-zinc-800 rounded-lg max-h-40 overflow-y-auto z-40 p-1 shadow-2xl" role="listbox">
           {options.map((opt) => {
             const isSel = selected.includes(opt);
             return (
               <button
                 key={opt}
+                role="option"
+                aria-selected={isSel}
                 onClick={() => toggleOption(opt)}
                 className="w-full text-left text-xs hover:bg-zinc-850 px-2 py-1.5 rounded flex items-center justify-between text-zinc-300 hover:text-white transition"
               >
@@ -472,18 +479,20 @@ FilterPanel.BooleanToggle = function BooleanToggle({
     <div className="bg-zinc-900 border border-zinc-800/80 p-3 rounded-lg flex items-center justify-between">
       <div>
         <span className="text-xs font-semibold text-zinc-300 block">{label}</span>
-        <span className="text-[10px] text-zinc-500 block font-mono mt-0.5 truncate max-w-[150px]" title={expression}>
+        <span className="text-[10px] text-zinc-400 block font-mono mt-0.5 truncate max-w-[150px]" title={expression}>
           {expression}
         </span>
       </div>
       <button
         onClick={() => setActive(!active)}
         className="text-zinc-400 hover:text-white transition focus:outline-none"
+        aria-pressed={active}
+        aria-label={`Toggle ${label}`}
       >
         {active ? (
-          <ToggleRight className="h-7 w-7 text-amber-500" />
+          <ToggleRight className="h-7 w-7 text-amber-500" aria-hidden="true" />
         ) : (
-          <ToggleLeft className="h-7 w-7 text-zinc-600" />
+          <ToggleLeft className="h-7 w-7 text-zinc-400" aria-hidden="true" />
         )}
       </button>
     </div>
@@ -718,7 +727,7 @@ export function ScreenerGrid({ stocks }: ScreenerGridProps) {
         {/* Table Header */}
         <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 z-20 flex" role="row">
           {table.getHeaderGroups().map((headerGroup) => (
-            <div key={headerGroup.id} className="flex w-full">
+            <div key={headerGroup.id} className="flex w-full" role="presentation">
               {headerGroup.headers.map((header) => {
                 const isSorted = header.column.getIsSorted();
                 return (
@@ -840,7 +849,7 @@ export function StockDetails({ symbol }: { symbol: string }) {
           <div key={idx} className="bg-zinc-900 border border-zinc-800/60 p-3 rounded-xl hover:border-zinc-700/60 transition duration-150">
             <span className="text-[10px] text-zinc-400 block font-semibold uppercase tracking-wider">{item.label}</span>
             <span className="text-base font-bold text-white font-mono">{item.val}</span>
-            <span className="text-[10px] text-zinc-500 block">{item.desc}</span>
+            <span className="text-[10px] text-zinc-400 block">{item.desc}</span>
           </div>
         ))}
       </div>
@@ -854,11 +863,11 @@ export function StockDetails({ symbol }: { symbol: string }) {
           <div className="overflow-x-auto">
             <table className="w-full text-xs font-mono" aria-label="Detailed stock ratio ledger">
               <thead>
-                <tr className="text-zinc-500 text-left border-b border-zinc-800/80">
-                  <th className="py-1.5 font-semibold">Year</th>
-                  <th className="py-1.5 text-right font-semibold">Revenue</th>
-                  <th className="py-1.5 text-right font-semibold">Gross Profit</th>
-                  <th className="py-1.5 text-right font-semibold">Net Income</th>
+                <tr className="text-zinc-400 text-left border-b border-zinc-800/80">
+                  <th scope="col" className="py-1.5 font-semibold">Year</th>
+                  <th scope="col" className="py-1.5 text-right font-semibold">Revenue</th>
+                  <th scope="col" className="py-1.5 text-right font-semibold">Gross Profit</th>
+                  <th scope="col" className="py-1.5 text-right font-semibold">Net Income</th>
                 </tr>
               </thead>
               <tbody>
@@ -883,11 +892,11 @@ export function StockDetails({ symbol }: { symbol: string }) {
           <div className="overflow-x-auto">
             <table className="w-full text-xs font-mono" aria-label="Detailed stock ratio ledger">
               <thead>
-                <tr className="text-zinc-500 text-left border-b border-zinc-800/80">
-                  <th className="py-1.5 font-semibold">Year</th>
-                  <th className="py-1.5 text-right font-semibold">Total Assets</th>
-                  <th className="py-1.5 text-right font-semibold">Liabilities</th>
-                  <th className="py-1.5 text-right font-semibold">Equity</th>
+                <tr className="text-zinc-400 text-left border-b border-zinc-800/80">
+                  <th scope="col" className="py-1.5 font-semibold">Year</th>
+                  <th scope="col" className="py-1.5 text-right font-semibold">Total Assets</th>
+                  <th scope="col" className="py-1.5 text-right font-semibold">Liabilities</th>
+                  <th scope="col" className="py-1.5 text-right font-semibold">Equity</th>
                 </tr>
               </thead>
               <tbody>
@@ -919,7 +928,7 @@ const StockChart = dynamic(() => import("./components/StockChart"), {
     <div className="w-full h-[500px] animate-pulse bg-zinc-900 rounded-xl flex items-center justify-center border border-zinc-800 shadow-2xl" aria-busy="true" aria-label="Loading chart data...">
       <div className="flex flex-col items-center gap-4">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent"></div>
-        <p className="text-sm font-medium text-zinc-500">Initializing chart canvas...</p>
+        <p className="text-sm font-medium text-zinc-400">Initializing chart canvas...</p>
       </div>
     </div>
   )
@@ -976,7 +985,7 @@ export default function Home() {
           <div>
             <h1 className="text-lg font-extrabold tracking-tight text-white flex items-center gap-1.5">
               AEGIS
-              <span className="text-zinc-500 font-medium text-xs bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
+              <span className="text-zinc-400 font-medium text-xs bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded uppercase tracking-wider">
                 Terminal
               </span>
             </h1>
@@ -1025,7 +1034,7 @@ export default function Home() {
           </div>
           <div className="bg-zinc-900/40 border border-zinc-800/60 p-4 rounded-xl flex items-center justify-center gap-2">
             <div className="relative w-full">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
               <input
                 type="text"
                 aria-label="Search for a ticker symbol"
@@ -1066,7 +1075,7 @@ export default function Home() {
               {selectedSymbol ? (
                 <StockDetails symbol={selectedSymbol} />
               ) : (
-                <div className="h-full flex flex-col items-center justify-center rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-500 p-8 text-center text-xs">
+                <div className="h-full flex flex-col items-center justify-center rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-400 p-8 text-center text-xs">
                   <Landmark className="h-8 w-8 mb-2 opacity-50" />
                   Select a ticker symbol in the data grid to audit corporate ledger ratios.
                 </div>
@@ -1083,7 +1092,7 @@ export default function Home() {
         )}
       </main>
 
-      <footer className="mt-auto border-t border-zinc-900 bg-zinc-950/40 py-6 text-center text-xs text-zinc-600">
+      <footer className="mt-auto border-t border-zinc-900 bg-zinc-950/40 py-6 text-center text-xs text-zinc-400">
         <p>© 2026 Aegis Terminal. Designed for ultra-low latency canvas visualization.</p>
       </footer>
     </div>

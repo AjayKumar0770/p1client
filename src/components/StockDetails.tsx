@@ -112,7 +112,7 @@ export default function StockDetails({ symbol }: StockDetailsProps) {
           <div key={idx} className="bg-zinc-900 border border-zinc-800/60 p-3 rounded-xl hover:border-zinc-700/60 transition duration-150">
             <span className="text-[10px] text-zinc-400 block font-semibold uppercase tracking-wider">{item.label}</span>
             <span className="text-base font-bold text-white font-mono">{item.val}</span>
-            <span className="text-[10px] text-zinc-500 block">{item.desc}</span>
+            <span className="text-[10px] text-zinc-400 block">{item.desc}</span>
           </div>
         ))}
       </div>
@@ -128,11 +128,11 @@ export default function StockDetails({ symbol }: StockDetailsProps) {
           <div className="overflow-x-auto">
             <table className="w-full text-xs font-mono">
               <thead>
-                <tr className="text-zinc-500 text-left border-b border-zinc-800/80">
-                  <th className="py-1.5 font-semibold">Year</th>
-                  <th className="py-1.5 text-right font-semibold">Revenue</th>
-                  <th className="py-1.5 text-right font-semibold">Gross Profit</th>
-                  <th className="py-1.5 text-right font-semibold">Net Income</th>
+                <tr className="text-zinc-400 text-left border-b border-zinc-800/80">
+                  <th scope="col" className="py-1.5 font-semibold">Year</th>
+                  <th scope="col" className="py-1.5 text-right font-semibold">Revenue</th>
+                  <th scope="col" className="py-1.5 text-right font-semibold">Gross Profit</th>
+                  <th scope="col" className="py-1.5 text-right font-semibold">Net Income</th>
                 </tr>
               </thead>
               <tbody>
@@ -158,11 +158,11 @@ export default function StockDetails({ symbol }: StockDetailsProps) {
           <div className="overflow-x-auto">
             <table className="w-full text-xs font-mono">
               <thead>
-                <tr className="text-zinc-500 text-left border-b border-zinc-800/80">
-                  <th className="py-1.5 font-semibold">Year</th>
-                  <th className="py-1.5 text-right font-semibold">Total Assets</th>
-                  <th className="py-1.5 text-right font-semibold">Liabilities</th>
-                  <th className="py-1.5 text-right font-semibold">Equity</th>
+                <tr className="text-zinc-400 text-left border-b border-zinc-800/80">
+                  <th scope="col" className="py-1.5 font-semibold">Year</th>
+                  <th scope="col" className="py-1.5 text-right font-semibold">Total Assets</th>
+                  <th scope="col" className="py-1.5 text-right font-semibold">Liabilities</th>
+                  <th scope="col" className="py-1.5 text-right font-semibold">Equity</th>
                 </tr>
               </thead>
               <tbody>

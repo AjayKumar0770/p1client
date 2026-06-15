@@ -86,20 +86,24 @@ export default function StockChart({ symbol }: { symbol: string }) {
   }, [history, livePrice]);
 
   const indicators = useMemo(() => {
-    if (historyWithLiveTick.length === 0) return null;
+    if (history.length === 0) return null;
 
-    const sma50 = calculateSMA(historyWithLiveTick, 50);
-    const ema12 = calculateEMA(historyWithLiveTick, 12);
-    const ema26 = calculateEMA(historyWithLiveTick, 26);
-    const bb = calculateBollingerBands(historyWithLiveTick, 20, 2);
-    const rsi = calculateRSI(historyWithLiveTick, 14);
-    const volProfile = calculateVolumeProfile(historyWithLiveTick, 24);
+    const sma50 = calculateSMA(history, 50);
+    const ema12 = calculateEMA(history, 12);
+    const ema26 = calculateEMA(history, 26);
+    const bb = calculateBollingerBands(history, 20, 2);
+    const rsi = calculateRSI(history, 14);
+    const volProfile = calculateVolumeProfile(history, 24);
 
     return { sma50, ema12, ema26, bb, rsi, volProfile };
-  }, [historyWithLiveTick]);
+  }, [history]);
+
+  const chartApiRef = useRef<any>(null);
+  const rsiApiRef = useRef<any>(null);
+  const seriesRefs = useRef<any>({});
 
   useEffect(() => {
-    if (isLoading || historyWithLiveTick.length === 0 || !mainChartRef.current || !rsiChartRef.current) return;
+    if (isLoading || history.length === 0 || !mainChartRef.current || !rsiChartRef.current) return;
 
     mainChartRef.current.innerHTML = "";
     rsiChartRef.current.innerHTML = "";
@@ -136,6 +140,8 @@ export default function StockChart({ symbol }: { symbol: string }) {
       }
     });
 
+    chartApiRef.current = mainChart;
+
     const candleSeries = mainChart.addSeries(CandlestickSeries, {
       upColor: themeColors.upColor,
       downColor: themeColors.downColor,
@@ -144,51 +150,7 @@ export default function StockChart({ symbol }: { symbol: string }) {
       wickDownColor: themeColors.downColor,
       wickUpColor: themeColors.upColor
     });
-
-    candleSeries.setData(
-      historyWithLiveTick.map((c) => ({
-        time: c.time as unknown as UTCTimestamp,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close
-      }))
-    );
-
-    if (showSMA && indicators?.sma50) {
-      const smaSeries = mainChart.addSeries(LineSeries, {
-        color: themeColors.smaColor,
-        lineWidth: 2,
-        title: "SMA 50"
-      });
-      smaSeries.setData(indicators.sma50.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.value })));
-    }
-
-    if (showEMA && indicators) {
-      const ema12Series = mainChart.addSeries(LineSeries, {
-        color: themeColors.ema12Color,
-        lineWidth: 1,
-        title: "EMA 12"
-      });
-      ema12Series.setData(indicators.ema12.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.value })));
-
-      const ema26Series = mainChart.addSeries(LineSeries, {
-        color: themeColors.ema26Color,
-        lineWidth: 1,
-        title: "EMA 26"
-      });
-      ema26Series.setData(indicators.ema26.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.value })));
-    }
-
-    if (showBB && indicators?.bb) {
-      const bbUpperSeries = mainChart.addSeries(LineSeries, { color: themeColors.bbLines, lineWidth: 1, lineStyle: 1, title: "BB Upper" });
-      const bbMiddleSeries = mainChart.addSeries(LineSeries, { color: themeColors.bbMiddle, lineWidth: 1, title: "BB Middle" });
-      const bbLowerSeries = mainChart.addSeries(LineSeries, { color: themeColors.bbLines, lineWidth: 1, lineStyle: 1, title: "BB Lower" });
-
-      bbUpperSeries.setData(indicators.bb.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.upper })));
-      bbMiddleSeries.setData(indicators.bb.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.middle })));
-      bbLowerSeries.setData(indicators.bb.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.lower })));
-    }
+    seriesRefs.current.candle = candleSeries;
 
     const rsiChart = createChart(rsiChartRef.current, {
       width: rsiChartRef.current.clientWidth || 600,
@@ -205,30 +167,153 @@ export default function StockChart({ symbol }: { symbol: string }) {
         borderColor: themeColors.grid
       }
     });
+    rsiApiRef.current = rsiChart;
 
-    const rsiSeries = rsiChart.addSeries(LineSeries, {
+    seriesRefs.current.rsi = rsiChart.addSeries(LineSeries, {
       color: themeColors.rsiLine,
       lineWidth: 2,
       title: "RSI 14"
     });
 
-    if (indicators?.rsi) {
-      rsiSeries.setData(indicators.rsi.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.value })));
+    seriesRefs.current.rsi30 = rsiChart.addSeries(LineSeries, { color: themeColors.rsiGuide, lineWidth: 1, lineStyle: 3 });
+    seriesRefs.current.rsi70 = rsiChart.addSeries(LineSeries, { color: themeColors.rsiGuide, lineWidth: 1, lineStyle: 3 });
+
+    mainChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+      if (range) {
+        rsiChart.timeScale().setVisibleLogicalRange(range);
+      }
+    });
+
+    rsiChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+      if (range) mainChart.timeScale().setVisibleLogicalRange(range);
+    });
+
+    const handleResize = () => {
+      if (!mainChartRef.current || !rsiChartRef.current) return;
+      mainChart.resize(mainChartRef.current.clientWidth, 320);
+      rsiChart.resize(rsiChartRef.current.clientWidth, 120);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      mainChart.remove();
+      rsiChart.remove();
+      chartApiRef.current = null;
+      rsiApiRef.current = null;
+    };
+  }, [isLoading, history.length]);
+
+  useEffect(() => {
+    if (!chartApiRef.current || historyWithLiveTick.length === 0) return;
+    
+    const themeColors = {
+      smaColor: "#f59e0b",
+      ema12Color: "#3b82f6",
+      ema26Color: "#ec4899",
+      bbMiddle: "#8b5cf6",
+      bbLines: "rgba(139, 92, 246, 0.4)"
+    };
+
+    if (seriesRefs.current.candle) {
+      seriesRefs.current.candle.setData(
+        historyWithLiveTick.map((c) => ({
+          time: c.time as unknown as UTCTimestamp,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close
+        }))
+      );
     }
 
-    const rsi30Series = rsiChart.addSeries(LineSeries, { color: themeColors.rsiGuide, lineWidth: 1, lineStyle: 3 });
-    rsi30Series.setData(historyWithLiveTick.map(c => ({ time: c.time as unknown as UTCTimestamp, value: 30 })));
+    if (showSMA && indicators?.sma50) {
+      if (!seriesRefs.current.sma) {
+        seriesRefs.current.sma = chartApiRef.current.addSeries(LineSeries, {
+          color: themeColors.smaColor,
+          lineWidth: 2,
+          title: "SMA 50"
+        });
+      }
+      seriesRefs.current.sma.setData(indicators.sma50.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.value })));
+    } else if (seriesRefs.current.sma) {
+      chartApiRef.current.removeSeries(seriesRefs.current.sma);
+      seriesRefs.current.sma = null;
+    }
 
-    const rsi70Series = rsiChart.addSeries(LineSeries, { color: themeColors.rsiGuide, lineWidth: 1, lineStyle: 3 });
-    rsi70Series.setData(historyWithLiveTick.map(c => ({ time: c.time as unknown as UTCTimestamp, value: 70 })));
+    if (showEMA && indicators) {
+      if (!seriesRefs.current.ema12) {
+        seriesRefs.current.ema12 = chartApiRef.current.addSeries(LineSeries, {
+          color: themeColors.ema12Color,
+          lineWidth: 1,
+          title: "EMA 12"
+        });
+      }
+      seriesRefs.current.ema12.setData(indicators.ema12.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.value })));
+
+      if (!seriesRefs.current.ema26) {
+        seriesRefs.current.ema26 = chartApiRef.current.addSeries(LineSeries, {
+          color: themeColors.ema26Color,
+          lineWidth: 1,
+          title: "EMA 26"
+        });
+      }
+      seriesRefs.current.ema26.setData(indicators.ema26.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.value })));
+    } else {
+      if (seriesRefs.current.ema12) {
+        chartApiRef.current.removeSeries(seriesRefs.current.ema12);
+        seriesRefs.current.ema12 = null;
+      }
+      if (seriesRefs.current.ema26) {
+        chartApiRef.current.removeSeries(seriesRefs.current.ema26);
+        seriesRefs.current.ema26 = null;
+      }
+    }
+
+    if (showBB && indicators?.bb) {
+      if (!seriesRefs.current.bbUpper) {
+        seriesRefs.current.bbUpper = chartApiRef.current.addSeries(LineSeries, { color: themeColors.bbLines, lineWidth: 1, lineStyle: 1, title: "BB Upper" });
+        seriesRefs.current.bbMiddle = chartApiRef.current.addSeries(LineSeries, { color: themeColors.bbMiddle, lineWidth: 1, title: "BB Middle" });
+        seriesRefs.current.bbLower = chartApiRef.current.addSeries(LineSeries, { color: themeColors.bbLines, lineWidth: 1, lineStyle: 1, title: "BB Lower" });
+      }
+      seriesRefs.current.bbUpper.setData(indicators.bb.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.upper })));
+      seriesRefs.current.bbMiddle.setData(indicators.bb.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.middle })));
+      seriesRefs.current.bbLower.setData(indicators.bb.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.lower })));
+    } else {
+      if (seriesRefs.current.bbUpper) {
+        chartApiRef.current.removeSeries(seriesRefs.current.bbUpper);
+        chartApiRef.current.removeSeries(seriesRefs.current.bbMiddle);
+        chartApiRef.current.removeSeries(seriesRefs.current.bbLower);
+        seriesRefs.current.bbUpper = null;
+        seriesRefs.current.bbMiddle = null;
+        seriesRefs.current.bbLower = null;
+      }
+    }
+
+    if (seriesRefs.current.rsi && indicators?.rsi) {
+      seriesRefs.current.rsi.setData(indicators.rsi.map(p => ({ time: p.time as unknown as UTCTimestamp, value: p.value })));
+    }
+
+    if (seriesRefs.current.rsi30) {
+      seriesRefs.current.rsi30.setData(historyWithLiveTick.map(c => ({ time: c.time as unknown as UTCTimestamp, value: 30 })));
+    }
+    if (seriesRefs.current.rsi70) {
+      seriesRefs.current.rsi70.setData(historyWithLiveTick.map(c => ({ time: c.time as unknown as UTCTimestamp, value: 70 })));
+    }
 
     let rafId: number | null = null;
-
     const drawVolumeProfile = () => {
       if (rafId) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         const canvas = overlayCanvasRef.current;
-        if (!canvas || !mainChartRef.current || !showVolProfile) return;
+        if (!canvas || !mainChartRef.current || !showVolProfile) {
+          if (canvas) {
+            const ctx = canvas.getContext("2d");
+            if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+          }
+          return;
+        }
 
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
@@ -237,7 +322,7 @@ export default function StockChart({ symbol }: { symbol: string }) {
         canvas.height = 320;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        const range = mainChart.timeScale().getVisibleLogicalRange();
+        const range = chartApiRef.current.timeScale().getVisibleLogicalRange();
         let visibleData = historyWithLiveTick;
         if (range) {
           const startIdx = Math.max(0, Math.floor(range.from));
@@ -248,7 +333,6 @@ export default function StockChart({ symbol }: { symbol: string }) {
         }
 
         if (visibleData.length === 0) return;
-        // Dynamically divide into 30 to 50 buckets depending on data scale
         const dynamicBins = Math.max(30, Math.min(50, Math.floor(visibleData.length / 5)));
         const volProfile = calculateVolumeProfile(visibleData, dynamicBins);
         const { bins } = volProfile;
@@ -257,8 +341,8 @@ export default function StockChart({ symbol }: { symbol: string }) {
         const profileWidth = canvas.width * 0.25;
 
         bins.forEach((bin) => {
-          const yMin = candleSeries.priceToCoordinate(bin.priceMin);
-          const yMax = candleSeries.priceToCoordinate(bin.priceMax);
+          const yMin = seriesRefs.current.candle.priceToCoordinate(bin.priceMin);
+          const yMax = seriesRefs.current.candle.priceToCoordinate(bin.priceMax);
 
           if (yMin === null || yMax === null) return;
 
@@ -282,35 +366,17 @@ export default function StockChart({ symbol }: { symbol: string }) {
       });
     };
 
-    mainChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-      if (range) {
-        rsiChart.timeScale().setVisibleLogicalRange(range);
-        drawVolumeProfile();
-      }
-    });
-
-    rsiChart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-      if (range) mainChart.timeScale().setVisibleLogicalRange(range);
-    });
-
-    const handleResize = () => {
-      if (!mainChartRef.current || !rsiChartRef.current) return;
-      mainChart.resize(mainChartRef.current.clientWidth, 320);
-      rsiChart.resize(rsiChartRef.current.clientWidth, 120);
-      drawVolumeProfile();
-    };
-
-    window.addEventListener("resize", handleResize);
-    const timer = setTimeout(drawVolumeProfile, 100);
+    drawVolumeProfile();
+    const handleRangeChange = () => drawVolumeProfile();
+    chartApiRef.current.timeScale().subscribeVisibleLogicalRangeChange(handleRangeChange);
 
     return () => {
-      window.removeEventListener("resize", handleResize);
-      clearTimeout(timer);
       if (rafId) cancelAnimationFrame(rafId);
-      mainChart.remove();
-      rsiChart.remove();
+      if (chartApiRef.current) {
+        chartApiRef.current.timeScale().unsubscribeVisibleLogicalRangeChange(handleRangeChange);
+      }
     };
-  }, [isLoading, historyWithLiveTick, showSMA, showEMA, showBB, showVolProfile, indicators]);
+  }, [historyWithLiveTick, showSMA, showEMA, showBB, showVolProfile, indicators]);
 
   if (isLoading) {
     return (

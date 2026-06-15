@@ -1053,8 +1053,7 @@ export function useStockScreener() {
     activeSubFilters,
     filterError, 
     setFilterError, 
-    sorting, 
-    prices 
+    sorting
   } = useScreenerStore(useShallow((state) => ({
     stocks: state.stocks,
     isLoadingStocks: state.isLoadingStocks,
@@ -1064,8 +1063,7 @@ export function useStockScreener() {
     activeSubFilters: state.activeSubFilters,
     filterError: state.filterError,
     setFilterError: state.setFilterError,
-    sorting: state.sorting,
-    prices: state.prices
+    sorting: state.sorting
   })));
 
   useEffect(() => {
@@ -1114,11 +1112,12 @@ export function useStockScreener() {
   const filteredAndSortedStocks = useMemo(() => {
     if (stocks.length === 0) return [];
     let result = stocks;
+    const currentPrices = useScreenerStore.getState().prices;
 
     if (parsedAST) {
       result = stocks.filter((stock) => {
         try {
-          return evaluateAST(parsedAST, stock, prices);
+          return evaluateAST(parsedAST, stock, currentPrices);
         } catch {
           return false;
         }
@@ -1127,8 +1126,8 @@ export function useStockScreener() {
       return []; // Return empty if active query fails compilation
     }
 
-    return stableSortStocks(result, sorting, prices);
-  }, [stocks, parsedAST, combinedFilterString, filterError, sorting, prices]);
+    return stableSortStocks(result, sorting, currentPrices);
+  }, [stocks, parsedAST, combinedFilterString, filterError, sorting]);
 
   return {
     stocks: filteredAndSortedStocks,
